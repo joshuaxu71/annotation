@@ -9,9 +9,4 @@ public class AnnotatedStudent {
         this.name = name;
         this.email = email;
     }
-
-    @Override
-    public String toString() {
-        return "name: " + name + ", email: " + email;
-    }
 }
