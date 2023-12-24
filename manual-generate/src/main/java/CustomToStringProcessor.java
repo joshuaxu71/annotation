@@ -1,28 +1,15 @@
-import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.Modifier;
-import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.AnnotationDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.expr.*;
-import com.github.javaparser.ast.stmt.BlockStmt;
-import com.github.javaparser.ast.stmt.ReturnStmt;
-import com.github.javaparser.ast.type.ClassOrInterfaceType;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.Writer;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @SupportedAnnotationTypes({"CustomToString"})
@@ -38,31 +25,12 @@ public class CustomToStringProcessor extends AbstractProcessor {
 
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnvironment) {
-		// Get the project root directory
-		String projectRoot = System.getProperty("user.dir");
-
 		for (TypeElement annotation : annotations) {
 			Set<? extends Element> annotatedElements = roundEnvironment.getElementsAnnotatedWith(annotation);
 
 			for (Element element : annotatedElements) {
-				// You can perform processing for each annotated element here
-				// For example, generate code, validate, or perform other actions
-
-				// Get the package of the annotated class
-				PackageElement packageElement = processingEnv.getElementUtils().getPackageOf(element);
-
-				// Get the binary name of the annotated class
-				String binaryName = processingEnv.getElementUtils().getBinaryName((TypeElement) element).toString();
-
-				// Build the file path using the package and binary name
-				String filePath = packageElement.isUnnamed()
-					? binaryName + ".java"
-					: packageElement.getQualifiedName() + "." + binaryName + ".java";
-
-				filePath = projectRoot + "\\src\\main\\java\\" + filePath;
-
 				try {
-					addToStringMethodToClass((TypeElement) element, filePath);
+					addToStringMethodToClass((TypeElement) element, processingEnv);
 				} catch (IOException e) {
 					processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, e.getMessage());
 				}
@@ -71,91 +39,27 @@ public class CustomToStringProcessor extends AbstractProcessor {
 		return true;
 	}
 
-	private void addToStringMethodToClass(TypeElement typeElement, String filePath) throws IOException {
-		String className = typeElement.getSimpleName().toString();
-
-		// Get the qualified name of the class
-		String qualifiedClassName = typeElement.getQualifiedName().toString();
-
-		// Parse the existing Java file using JavaParser
-		JavaParser javaParser = new JavaParser();
-		FileInputStream in = new FileInputStream(filePath);
-		CompilationUnit cu = javaParser.parse(in).getResult().get();
-
+	private void addToStringMethodToClass(
+		TypeElement typeElement,
+		ProcessingEnvironment processingEnv
+	) throws IOException {
+		String filePath = CustomToStringProcessorHelper.getFilePath(typeElement, processingEnv);
+		CompilationUnit cu = CustomToStringProcessorHelper.getCompilationUnit(filePath);
 		cu.setPackageDeclaration("generated");
 
-		// Add the new method to the existing class
-		ClassOrInterfaceDeclaration declaration = cu.getClassByName(className).orElse(null);
+		ClassOrInterfaceDeclaration declaration = CustomToStringProcessorHelper.addToStringMethod(typeElement, cu);
 		if (declaration == null) {
 			return;
 		}
-
-		// Create the binary expression for the return statement
-		Expression binaryExpression = generateToStringMethod(
-			typeElement.getEnclosedElements().stream()
-				.filter(element -> ElementKind.FIELD.equals(element.getKind())).collect(Collectors.toList())
-		);
-
-		// Create a new method
-		MethodDeclaration toStringMethod = new MethodDeclaration()
-			.setModifiers(Modifier.Keyword.PUBLIC)
-			.addAnnotation(new MarkerAnnotationExpr(new Name("Override")))
-			.setType(new ClassOrInterfaceType(null, "String"))
-			.setName("toString")
-			.setBody(new BlockStmt().addStatement(
-				new ReturnStmt(binaryExpression)
-			));
 
 		// Remove the annotation since we've already processed it
 		declaration.getAnnotations().removeIf(annotationExpr ->
 			annotationExpr.getNameAsString().equals("CustomToString"));
 
-		// Add the new method to the existing class
-		declaration.addMember(toStringMethod);
-
 		// Get the JavaFileObject for the class and open a writer
-		JavaFileObject sourceFile = filer.createSourceFile(qualifiedClassName);
+		JavaFileObject sourceFile = filer.createSourceFile(typeElement.getQualifiedName().toString());
 		try (Writer writer = sourceFile.openWriter()) {
 			writer.write(cu.toString());
 		}
-
-	}
-
-	private Expression generateToStringMethod(List<Element> fields) {
-		List<BinaryExpr> binaryExprList = new ArrayList<>();
-
-		boolean first = true;
-		for (Element field : fields) {
-			String stringFormat = ", %s: ";
-			if (first) {
-				stringFormat = "%s: ";
-				first = false;
-			}
-
-			binaryExprList.add(new BinaryExpr(
-				new StringLiteralExpr(String.format(stringFormat, field.getSimpleName().toString())),
-				new NameExpr(field.getSimpleName().toString()),
-				BinaryExpr.Operator.PLUS
-			));
-		}
-
-		return mergeBinaryExpressions(binaryExprList);
-	}
-
-	private Expression mergeBinaryExpressions(List<BinaryExpr> expressions) {
-		if (expressions.isEmpty()) {
-			throw new IllegalArgumentException("List of expressions is empty.");
-		}
-
-		Expression result = expressions.get(0);
-		for (int i = 1; i < expressions.size(); i++) {
-			BinaryExpr nextExpression = expressions.get(i);
-			result = new BinaryExpr(
-				result,
-				new BinaryExpr(nextExpression.getLeft(), nextExpression.getRight(), nextExpression.getOperator()),
-				nextExpression.getOperator());
-		}
-
-		return result;
 	}
 }
