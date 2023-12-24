@@ -91,7 +91,7 @@ public class CustomToStringProcessor extends AbstractProcessor {
 		}
 
 		// Create the binary expression for the return statement
-		Expression binaryExpression = generateToStringMethod(
+		Expression binaryExpression = CustomToStringProcessorHelper.generateToStringMethod(
 			typeElement.getEnclosedElements().stream()
 				.filter(element -> ElementKind.FIELD.equals(element.getKind())).collect(Collectors.toList())
 		);
@@ -119,43 +119,5 @@ public class CustomToStringProcessor extends AbstractProcessor {
 			writer.write(cu.toString());
 		}
 
-	}
-
-	private Expression generateToStringMethod(List<Element> fields) {
-		List<BinaryExpr> binaryExprList = new ArrayList<>();
-
-		boolean first = true;
-		for (Element field : fields) {
-			String stringFormat = ", %s: ";
-			if (first) {
-				stringFormat = "%s: ";
-				first = false;
-			}
-
-			binaryExprList.add(new BinaryExpr(
-				new StringLiteralExpr(String.format(stringFormat, field.getSimpleName().toString())),
-				new NameExpr(field.getSimpleName().toString()),
-				BinaryExpr.Operator.PLUS
-			));
-		}
-
-		return mergeBinaryExpressions(binaryExprList);
-	}
-
-	private Expression mergeBinaryExpressions(List<BinaryExpr> expressions) {
-		if (expressions.isEmpty()) {
-			throw new IllegalArgumentException("List of expressions is empty.");
-		}
-
-		Expression result = expressions.get(0);
-		for (int i = 1; i < expressions.size(); i++) {
-			BinaryExpr nextExpression = expressions.get(i);
-			result = new BinaryExpr(
-				result,
-				new BinaryExpr(nextExpression.getLeft(), nextExpression.getRight(), nextExpression.getOperator()),
-				nextExpression.getOperator());
-		}
-
-		return result;
 	}
 }
