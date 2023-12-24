@@ -1,14 +1,75 @@
-import com.github.javaparser.ast.expr.BinaryExpr;
-import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.NameExpr;
-import com.github.javaparser.ast.expr.StringLiteralExpr;
+import com.github.javaparser.JavaParser;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.Modifier;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.stmt.BlockStmt;
+import com.github.javaparser.ast.stmt.ReturnStmt;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
 
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class CustomToStringProcessorHelper {
-	public static Expression generateToStringMethod(List<Element> fields) {
+	public static String getFilePath(TypeElement typeElement, ProcessingEnvironment processingEnv) {
+		// Get the package of the annotated class
+		PackageElement packageElement = processingEnv.getElementUtils().getPackageOf(typeElement);
+
+		// Get the binary name of the annotated class
+		String binaryName = processingEnv.getElementUtils().getBinaryName(typeElement).toString();
+
+		// Build the file path using the package and binary name
+		String filePath = packageElement.isUnnamed()
+			? binaryName + ".java"
+			: packageElement.getQualifiedName() + "." + binaryName + ".java";
+
+		return System.getProperty("user.dir") + "\\src\\main\\java\\" + filePath;
+	}
+
+	public static CompilationUnit getCompilationUnit(String filePath) throws IOException {
+		// Parse the existing Java file using JavaParser
+		JavaParser javaParser = new JavaParser();
+		FileInputStream in = new FileInputStream(filePath);
+		CompilationUnit cu = javaParser.parse(in).getResult().get();
+		in.close();
+		return cu;
+	}
+
+	public static ClassOrInterfaceDeclaration addToStringMethod(TypeElement typeElement, CompilationUnit cu) {
+		String className = typeElement.getSimpleName().toString();
+		ClassOrInterfaceDeclaration declaration = cu.getClassByName(className).orElse(null);
+		if (declaration == null) {
+			return null;
+		}
+
+		Expression binaryExpression = CustomToStringProcessorHelper.generateToStringMethod(
+			typeElement.getEnclosedElements().stream()
+				.filter(element -> ElementKind.FIELD.equals(element.getKind())).collect(Collectors.toList())
+		);
+
+		MethodDeclaration toStringMethod = new MethodDeclaration()
+			.setModifiers(Modifier.Keyword.PUBLIC)
+			.addAnnotation(new MarkerAnnotationExpr(new Name("Override")))
+			.setType(new ClassOrInterfaceType(null, "String"))
+			.setName("toString")
+			.setBody(new BlockStmt().addStatement(
+				new ReturnStmt(binaryExpression)
+			));
+
+		declaration.addMember(toStringMethod);
+
+		return declaration;
+	}
+	private static Expression generateToStringMethod(List<Element> fields) {
 		List<BinaryExpr> binaryExprList = new ArrayList<>();
 
 		boolean first = true;
