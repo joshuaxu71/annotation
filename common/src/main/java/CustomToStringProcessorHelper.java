@@ -1,6 +1,7 @@
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
+import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.*;
@@ -50,6 +51,19 @@ public class CustomToStringProcessorHelper {
 		if (declaration == null) {
 			return null;
 		}
+
+		// Replace existing toString() method
+		declaration.setMembers(
+			declaration.getMembers().stream()
+				.filter(member -> {
+					if (member.isMethodDeclaration()) {
+						MethodDeclaration methodDeclaration = (MethodDeclaration) member;
+						return !methodDeclaration.getNameAsString().equals("toString");
+					}
+					return true;
+				})
+				.collect(NodeList.toNodeList())
+		);
 
 		Expression binaryExpression = CustomToStringProcessorHelper.generateToStringMethod(
 			typeElement.getEnclosedElements().stream()
