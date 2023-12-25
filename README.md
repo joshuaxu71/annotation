@@ -15,3 +15,6 @@ You can see the results of each method in the respective modules.
 
 To run the modules properly, please run `mvn install -f .\common\` first since
 they are dependent on the common module.
+
+Also, when compiling each submodule, please do it from the respective submodule,
+because I'm using user.dir as part of the file path generation :3
