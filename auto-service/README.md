@@ -11,4 +11,4 @@ This is just a duplicate of the manual-replace module, but with slight changes. 
 The reason we need to separate the annotation processor module is because when the @AutoService annotation
 is processed, it generates the META-INF file in the output's classes directory (e.g. target\classes\META-INF).
 However, this file is not accessed in the same compilation, so we need to move the actual implementation of the 
-annotation to another module (auto-service-impl).
+annotation to another module ([auto-service-impl](https://github.com/joshuaxu71/annotation/tree/auto-service/auto-service-impl)).
