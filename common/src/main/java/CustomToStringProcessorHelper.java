@@ -52,7 +52,7 @@ public class CustomToStringProcessorHelper {
 			return null;
 		}
 
-		// Replace existing toString() method
+		// Remove existing toString() method
 		declaration.setMembers(
 			declaration.getMembers().stream()
 				.filter(member -> {
@@ -65,25 +65,16 @@ public class CustomToStringProcessorHelper {
 				.collect(NodeList.toNodeList())
 		);
 
-		Expression binaryExpression = CustomToStringProcessorHelper.generateToStringMethod(
+		// Generate the toString() method and add it to the class
+		MethodDeclaration toStringMethod = CustomToStringProcessorHelper.generateToStringMethod(
 			typeElement.getEnclosedElements().stream()
 				.filter(element -> ElementKind.FIELD.equals(element.getKind())).collect(Collectors.toList())
 		);
-
-		MethodDeclaration toStringMethod = new MethodDeclaration()
-			.setModifiers(Modifier.Keyword.PUBLIC)
-			.addAnnotation(new MarkerAnnotationExpr(new Name("Override")))
-			.setType(new ClassOrInterfaceType(null, "String"))
-			.setName("toString")
-			.setBody(new BlockStmt().addStatement(
-				new ReturnStmt(binaryExpression)
-			));
-
 		declaration.addMember(toStringMethod);
 
 		return declaration;
 	}
-	private static Expression generateToStringMethod(List<Element> fields) {
+	private static MethodDeclaration generateToStringMethod(List<Element> fields) {
 		List<BinaryExpr> binaryExprList = new ArrayList<>();
 
 		boolean first = true;
@@ -94,6 +85,7 @@ public class CustomToStringProcessorHelper {
 				first = false;
 			}
 
+			// Generates the expression fieldName: {field}, e.g. "name: " + name
 			binaryExprList.add(new BinaryExpr(
 				new StringLiteralExpr(String.format(stringFormat, field.getSimpleName().toString())),
 				new NameExpr(field.getSimpleName().toString()),
@@ -101,7 +93,16 @@ public class CustomToStringProcessorHelper {
 			));
 		}
 
-		return mergeBinaryExpressions(binaryExprList);
+		Expression binaryExpression = mergeBinaryExpressions(binaryExprList);
+
+		return new MethodDeclaration()
+			.setModifiers(Modifier.Keyword.PUBLIC)
+			.addAnnotation(new MarkerAnnotationExpr(new Name("Override")))
+			.setType(new ClassOrInterfaceType(null, "String"))
+			.setName("toString")
+			.setBody(new BlockStmt().addStatement(
+				new ReturnStmt(binaryExpression)
+			));
 	}
 
 	private static Expression mergeBinaryExpressions(List<BinaryExpr> expressions) {
