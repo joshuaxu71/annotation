@@ -39,7 +39,6 @@
                             <compilerArgument>-proc:none</compilerArgument>
                             <includes>
                                 <include>CustomToStringProcessor.java</include>
-                                <!--include dependencies required for LogMeCustomAnnotationProcessor -->
                             </includes>
                         </configuration>
                     </execution>
