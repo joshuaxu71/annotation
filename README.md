@@ -1,5 +1,7 @@
 # Annotations
 
+Medium Blog Post: [link](https://medium.com/@joshuaxu71/things-we-take-for-granted-1-annotations-e45c94a4fde0)
+
 Hello :D
 
 In this repository, we are exploring how annotations work in Java (Maven).
